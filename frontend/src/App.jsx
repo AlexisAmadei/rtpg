@@ -11,7 +11,7 @@ function Topbar() {
     const token = auth?.token
     return (
         <header className="topbar">
-            <div className="brand"><Link to="/">Ratt</Link></div>
+            <div className="brand"><Link to="/">RTPG</Link></div>
             <nav className="nav">
                 {token ? (
                     <>

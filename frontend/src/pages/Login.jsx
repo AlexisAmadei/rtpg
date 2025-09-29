@@ -39,7 +39,7 @@ export default function Login() {
     return (
         <div className="center">
             <div className="card">
-                <h1>Ratt — Sign in</h1>
+                <h1>RTPG — Sign in</h1>
                 {err && <p className="err">{err}</p>}
                 <label>Email</label>
                 <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
