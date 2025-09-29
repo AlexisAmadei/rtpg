@@ -1,0 +1,2 @@
+## Postman Collection
+A Postman collection for testing the API can be found [here](https://wsf777.postman.co/workspace/wsf~aa8ed000-a7a8-4330-955c-9c281e9eba62/collection/26370397-f7986a75-bb26-4613-a323-19a141b95370?action=share&creator=26370397).
