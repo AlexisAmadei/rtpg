@@ -1,43 +1,43 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const db = require("../db");
 
-// In-memory store (replace with DB later)
-const users = [];
+// prepared statements
+const stmtFindByEmail = db.prepare("SELECT id, email, password_hash FROM users WHERE email = ?");
+const stmtInsertUser = db.prepare("INSERT INTO users (email, password_hash) VALUES (?, ?)");
 
-// register
 async function register(req, res) {
     const { email, password } = req.body || {};
-    if (!email || !password)
-        return res.status(400).json({ error: "Email and password required" });
+    if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
-    if (users.find(u => u.email === email))
-        return res.status(409).json({ error: "User already exists" });
+    // already exists?
+    const existing = stmtFindByEmail.get(email);
+    if (existing) return res.status(409).json({ error: "User already exists" });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = { id: Date.now(), email, hash };
-    users.push(user);
+    const info = stmtInsertUser.run(email, hash);
 
-    res.status(201).json({ message: "User created", id: user.id });
+    return res.status(201).json({ message: "User created", id: info.lastInsertRowid });
 }
 
-// login
 async function login(req, res) {
     const { email, password } = req.body || {};
-    const user = users.find(u => u.email === email);
+    if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+    const user = stmtFindByEmail.get(email);
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
-    const match = await bcrypt.compare(password, user.hash);
-    if (!match) return res.status(401).json({ error: "Invalid credentials" });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = jwt.sign(
         { id: user.id, email: user.email },
         process.env.JWT_SECRET || "dev-secret",
         { expiresIn: "2h" }
     );
-    res.json({ token });
+    return res.json({ token });
 }
 
-// middleware to protect routes
 function requireAuth(req, res, next) {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : null;
