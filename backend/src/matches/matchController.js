@@ -1,6 +1,28 @@
 const { withLinks } = require("../utils/hateoas");
 
-let matches = [];
+const stmtInsertMatch = db.prepare(`
+    INSERT INTO matches (creator_id, board, turn, status)
+    VALUES (@creator_id, @board, @turn, @status)
+`);
+const stmtListMatches = db.prepare(`
+    SELECT * FROM matches
+    WHERE creator_id = @uid OR opponent_id = @uid
+    ORDER BY created_at DESC
+`);
+const stmtGetMatch = db.prepare(`SELECT * FROM matches WHERE id = ?`);
+const stmtJoinMatch = db.prepare(`
+    UPDATE matches SET opponent_id = @oid, status='in_progress'
+    WHERE id=@id AND opponent_id IS NULL
+`);
+const stmtUpdateMatch = db.prepare(`
+    UPDATE matches
+    SET board=@board, turn=@turn, status=@status, winner=@winner
+    WHERE id=@id
+`);
+const stmtInsertMove = db.prepare(`
+    INSERT INTO moves (match_id, player_id, index_pos, symbol)
+    VALUES (@mid, @pid, @index, @symbol)
+`);
 
 function createMatch(req, res) {
     const user = req.user;
