@@ -1,0 +1,436 @@
+openapi: 3.0.0
+info:
+  title: Rattrapage API
+  version: 1.0.0
+  description: |
+    REST API.
+    - Versioning: `/api/v1`
+    - Auth: Register/Login (JWT Bearer)
+    - i18n: `Accept-Language: en|fr`
+    - Formats via `Accept`:
+      - `application/json` (default)
+      - `application/hal+json` (HAL with `_links`)
+      - `text/csv` (for list endpoints and single resource export)
+servers:
+  - url: http://localhost:4001
+    description: Local development
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: Preferred language for messages (en or fr)
+      schema:
+        type: string
+        enum: [en, fr]
+  schemas:
+    Link:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          href:
+            type: string
+          method:
+            type: string
+          type:
+            type: string
+        required: [href]
+    Health:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        msg:
+          type: string
+        ts:
+          type: number
+      required: [ok, ts]
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+      required: [token]
+    UserCreated:
+      type: object
+      properties:
+        message:
+          type: string
+        id:
+          type: integer
+          format: int64
+      required: [message, id]
+    Match:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        creator_id:
+          type: integer
+          format: int64
+        opponent_id:
+          type: integer
+          format: int64
+          nullable: true
+        board:
+          type: string
+          description: 9-char board string using '_' for empty cells
+          pattern: "^[XO_]{9}$"
+        turn:
+          type: string
+          enum: [X, O]
+        status:
+          type: string
+          enum: [waiting, in_progress, finished]
+        winner:
+          type: string
+          enum: [X, O, draw]
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, creator_id, board, turn, status, created_at]
+    MatchHAL:
+      allOf:
+        - $ref: '#/components/schemas/Match'
+        - type: object
+          properties:
+            _links:
+              $ref: '#/components/schemas/Link'
+    MatchList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Match'
+      required: [items]
+    MatchListHAL:
+      allOf:
+        - $ref: '#/components/schemas/MatchList'
+        - type: object
+          properties:
+            _links:
+              $ref: '#/components/schemas/Link'
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      tags: [System]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/v1:
+    get:
+      summary: API v1 entrypoint
+      operationId: getApiV1
+      tags: [System]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: API entry document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                required: [version]
+            application/hal+json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  _links:
+                    $ref: '#/components/schemas/Link'
+                required: [version, _links]
+  /api/v1/auth/register:
+    post:
+      summary: Register a new user
+      operationId: postRegister
+      tags: [Auth]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+              required: [email, password]
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreated'
+        '400':
+          description: Missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/login:
+    post:
+      summary: Login
+      operationId: postLogin
+      tags: [Auth]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+              required: [email, password]
+      responses:
+        '200':
+          description: Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/matches:
+    get:
+      summary: List matches for the authenticated user
+      operationId: listMatches
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: List of matches (multi-format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchList'
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/MatchListHAL'
+            text/csv:
+              schema:
+                type: string
+                description: CSV export of matches
+    post:
+      summary: Create a new match
+      operationId: createMatch
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '201':
+          description: Match created (multi-format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/MatchHAL'
+            text/csv:
+              schema:
+                type: string
+                description: CSV export of the created match
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/matches/{id}:
+    get:
+      summary: Get match by id
+      operationId: getMatch
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Match (multi-format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/MatchHAL'
+            text/csv:
+              schema:
+                type: string
+                description: CSV export of the match
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/matches/{id}/join:
+    post:
+      summary: Join a match as opponent (become O)
+      operationId: joinMatch
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Match after joining (multi-format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/MatchHAL'
+            text/csv:
+              schema:
+                type: string
+                description: CSV export of the match
+        '400':
+          description: Full or cannot join own match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/matches/{id}/move:
+    post:
+      summary: Make a move
+      operationId: makeMove
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                index:
+                  type: integer
+                  minimum: 0
+                  maximum: 8
+              required: [index]
+      responses:
+        '200':
+          description: Updated match (multi-format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/MatchHAL'
+            text/csv:
+              schema:
+                type: string
+                description: CSV export of the match
+        '400':
+          description: Invalid move (not your turn, cell taken, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not a player in this match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
