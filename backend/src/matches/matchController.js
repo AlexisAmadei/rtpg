@@ -26,16 +26,13 @@ const stmtInsertMove = db.prepare(`
 
 function createMatch(req, res) {
     const user = req.user;
-    const match = {
-        id: Date.now(),
-        creatorId: user.id,
-        opponentId: null,
-        board: Array(9).fill("_"),
+    const info = stmtInsertMatch.run({
+        creator_id: user.id,
+        board: "_________",
         turn: "X",
         status: "waiting",
-        winner: null,
-    };
-    matches.push(match);
+    });
+    const match = stmtGetMatch.get(info.lastInsertRowid);
     res.status(201).json(
         withLinks(match, {
             self: { href: `/api/v1/matches/${match.id}` },
@@ -46,11 +43,9 @@ function createMatch(req, res) {
 
 function listMatches(req, res) {
     const user = req.user;
-    const myMatches = matches.filter(
-        (m) => m.creatorId === user.id || m.opponentId === user.id
-    );
+    const items = stmtListMatches.all({ uid: user.id });
     res.json(
-        withLinks({ items: myMatches }, { create: { href: "/api/v1/matches", method: "POST" } })
+        withLinks({ items }, { create: { href: "/api/v1/matches", method: "POST" } })
     );
 }
 
