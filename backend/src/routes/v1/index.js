@@ -6,18 +6,15 @@ const authRouter = require("./auth");
 const matchesRouter = require("./matches");
 
 v1.get("/", (req, res) => {
-    res.json(
-        withLinks(
-            { version: "v1" },
-            {
-                self: { href: "/api/v1" },
-                health: { href: "/api/health" },
-                matches: { href: "/api/v1/matches" },
-                auth_register: { href: "/api/v1/auth/register", method: "POST" },
-                auth_login: { href: "/api/v1/auth/login", method: "POST" },
-            }
-        )
-    );
+    const { respond } = require("../../utils/respond");
+    const entry = { version: "v1" };
+    const links = {
+        self: { href: "/api/v1" },
+        health: { href: "/api/health" },
+        matches: { href: "/api/v1/matches" },
+        matches_csv: { href: "/api/v1/matches", type: "text/csv" },
+    };
+    respond(req, res, entry, links);
 });
 
 v1.use("/matches", matchesRouter);
