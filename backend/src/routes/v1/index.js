@@ -2,6 +2,9 @@ const { Router } = require("express");
 const { withLinks } = require("../../utils/hateoas");
 
 const v1 = Router();
+const authRouter = require("./auth");
+
+v1.use("/auth", authRouter);
 
 v1.get("/", (req, res) => {
   res.json(
