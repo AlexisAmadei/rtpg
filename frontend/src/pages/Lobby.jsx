@@ -12,7 +12,9 @@ export default function Lobby() {
         setLoading(true); setErr('')
         try {
             const res = await apiGet('/api/v1/matches')
-            setItems(res.items || [])
+            const list = Array.isArray(res) ? res : (res.items || [])
+            list.sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)) || (b.id - a.id))
+            setItems(list)
         } catch (e) {
             setErr(e?.error || 'Failed to load matches')
         } finally {
