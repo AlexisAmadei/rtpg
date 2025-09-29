@@ -1,3 +1,4 @@
+const db = require("../db");
 const { withLinks } = require("../utils/hateoas");
 
 const stmtInsertMatch = db.prepare(`
@@ -52,29 +53,30 @@ function listMatches(req, res) {
 function joinMatch(req, res) {
     const id = Number(req.params.id);
     const user = req.user;
-    const match = matches.find((m) => m.id === id);
+    const match = stmtGetMatch.get(id);
     if (!match) return res.status(404).json({ error: "Match not found" });
-    if (match.opponentId) return res.status(400).json({ error: "Match full" });
-    if (match.creatorId === user.id) return res.status(400).json({ error: "Cannot join own match" });
+    if (match.opponent_id) return res.status(400).json({ error: "Match full" });
+    if (match.creator_id === user.id)
+        return res.status(400).json({ error: "Cannot join own match" });
 
-    match.opponentId = user.id;
-    match.status = "in_progress";
+    stmtJoinMatch.run({ id, oid: user.id });
+    const updated = stmtGetMatch.get(id);
     res.json(
-        withLinks(match, {
-            self: { href: `/api/v1/matches/${match.id}` },
-            move: { href: `/api/v1/matches/${match.id}/move`, method: "POST" },
+        withLinks(updated, {
+            self: { href: `/api/v1/matches/${id}` },
+            move: { href: `/api/v1/matches/${id}/move`, method: "POST" },
         })
     );
 }
 
 function getMatch(req, res) {
     const id = Number(req.params.id);
-    const match = matches.find((m) => m.id === id);
+    const match = stmtGetMatch.get(id);
     if (!match) return res.status(404).json({ error: "Match not found" });
     res.json(
         withLinks(match, {
-            self: { href: `/api/v1/matches/${match.id}` },
-            move: { href: `/api/v1/matches/${match.id}/move`, method: "POST" },
+            self: { href: `/api/v1/matches/${id}` },
+            move: { href: `/api/v1/matches/${id}/move`, method: "POST" },
         })
     );
 }
@@ -83,55 +85,58 @@ function makeMove(req, res) {
     const id = Number(req.params.id);
     const { index } = req.body || {};
     const user = req.user;
-
-    const match = matches.find((m) => m.id === id);
+    const match = stmtGetMatch.get(id);
     if (!match) return res.status(404).json({ error: "Match not found" });
     if (match.status !== "in_progress")
         return res.status(400).json({ error: "Match not in progress" });
     if (match.winner) return res.status(400).json({ error: "Match finished" });
 
     const symbol = match.turn;
-    const isPlayerX = match.creatorId === user.id;
-    const isPlayerO = match.opponentId === user.id;
-
-    if (!isPlayerX && !isPlayerO)
+    const isX = match.creator_id === user.id;
+    const isO = match.opponent_id === user.id;
+    if (!isX && !isO)
         return res.status(403).json({ error: "Not a player in this match" });
-
-    if ((symbol === "X" && !isPlayerX) || (symbol === "O" && !isPlayerO))
+    if ((symbol === "X" && !isX) || (symbol === "O" && !isO))
         return res.status(400).json({ error: "Not your turn" });
-
     if (index < 0 || index > 8) return res.status(400).json({ error: "Invalid index" });
-    if (match.board[index] !== "_") return res.status(400).json({ error: "Cell taken" });
 
-    match.board[index] = symbol;
+    const board = match.board.split("");
+    if (board[index] !== "_") return res.status(400).json({ error: "Cell taken" });
+    board[index] = symbol;
 
+    // winner check
     const wins = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8],
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
-        [0, 4, 8], [2, 4, 6]
+        [0, 4, 8], [2, 4, 6],
     ];
-    if (wins.some(w => w.every(i => match.board[i] === symbol))) {
-        match.winner = symbol;
-        match.status = "finished";
-    } else if (match.board.every(c => c !== "_")) {
-        match.winner = "draw";
-        match.status = "finished";
-    } else {
-        match.turn = symbol === "X" ? "O" : "X";
+    let winner = null;
+    let status = match.status;
+    if (wins.some(w => w.every(i => board[i] === symbol))) {
+        winner = symbol;
+        status = "finished";
+    } else if (!board.includes("_")) {
+        winner = "draw";
+        status = "finished";
     }
+    const nextTurn = winner ? match.turn : (symbol === "X" ? "O" : "X");
 
+    stmtInsertMove.run({ mid: id, pid: user.id, index, symbol });
+    stmtUpdateMatch.run({
+        id,
+        board: board.join(""),
+        turn: nextTurn,
+        status,
+        winner,
+    });
+
+    const updated = stmtGetMatch.get(id);
     res.json(
-        withLinks(match, {
-            self: { href: `/api/v1/matches/${match.id}` },
-            move: { href: `/api/v1/matches/${match.id}/move`, method: "POST" },
+        withLinks(updated, {
+            self: { href: `/api/v1/matches/${id}` },
+            move: { href: `/api/v1/matches/${id}/move`, method: "POST" },
         })
     );
 }
 
-module.exports = {
-    createMatch,
-    listMatches,
-    joinMatch,
-    getMatch,
-    makeMove,
-};
+module.exports = { createMatch, listMatches, joinMatch, getMatch, makeMove };
