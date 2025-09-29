@@ -62,9 +62,9 @@ function joinMatch(req, res) {
     const id = Number(req.params.id);
     const user = req.user;
     const match = stmtGetMatch.get(id);
-    if (!match) return respond(req, res, { error: "Match not found" }, {}, {}, 404);
-    if (match.opponent_id) return respond(req, res, { error: "Match full" }, {}, {}, 400);
-    if (match.creator_id === user.id) return respond(req, res, { error: "Cannot join own match" }, {}, {}, 400);
+    if (!match) return respond(req, res, { error: req.t("MATCH_NOT_FOUND") }, {}, {}, 404);
+    if (match.opponent_id) return respond(req, res, { error: req.t("MATCH_FULL") }, {}, {}, 400);
+    if (match.creator_id === user.id) return respond(req, res, { error: req.t("CANNOT_JOIN_OWN") }, {}, {}, 400);
 
     stmtJoinMatch.run({ id, oid: user.id });
     const updated = stmtGetMatch.get(id);
@@ -80,7 +80,7 @@ function joinMatch(req, res) {
 function getMatch(req, res) {
     const id = Number(req.params.id);
     const match = stmtGetMatch.get(id);
-    if (!match) return respond(req, res, { error: "Match not found" }, {}, {}, 404);
+    if (!match) return respond(req, res, { error: req.t("MATCH_NOT_FOUND") }, {}, {}, 404);
     const links = {
         self: { href: `/api/v1/matches/${id}` },
         move: { href: `/api/v1/matches/${id}/move`, method: "POST" },
@@ -95,19 +95,19 @@ function makeMove(req, res) {
     const { index } = req.body || {};
     const user = req.user;
     const match = stmtGetMatch.get(id);
-    if (!match) return respond(req, res, { error: "Match not found" }, {}, {}, 404);
-    if (match.status !== "in_progress") return respond(req, res, { error: "Match not in progress" }, {}, {}, 400);
-    if (match.winner) return respond(req, res, { error: "Match finished" }, {}, {}, 400);
+    if (!match) return respond(req, res, { error: req.t("MATCH_NOT_FOUND") }, {}, {}, 404);
+    if (match.status !== "in_progress") return respond(req, res, { error: req.t("MATCH_NOT_IN_PROGRESS") }, {}, {}, 400);
+    if (match.winner) return respond(req, res, { error: req.t("MATCH_FINISHED") }, {}, {}, 400);
 
     const symbol = match.turn;
     const isX = match.creator_id === user.id;
     const isO = match.opponent_id === user.id;
-    if (!isX && !isO) return respond(req, res, { error: "Not a player in this match" }, {}, {}, 403);
-    if ((symbol === "X" && !isX) || (symbol === "O" && !isO)) return respond(req, res, { error: "Not your turn" }, {}, {}, 400);
-    if (index < 0 || index > 8) return respond(req, res, { error: "Invalid index" }, {}, {}, 400);
+    if (!isX && !isO) return respond(req, res, { error: req.t("NOT_A_PLAYER") }, {}, {}, 403);
+    if ((symbol === "X" && !isX) || (symbol === "O" && !isO)) return respond(req, res, { error: req.t("NOT_YOUR_TURN") }, {}, {}, 400);
+    if (index < 0 || index > 8) return respond(req, res, { error: req.t("INVALID_INDEX") }, {}, {}, 400);
 
     const board = match.board.split("");
-    if (board[index] !== "_") return respond(req, res, { error: "Cell taken" }, {}, {}, 400);
+    if (board[index] !== "_") return respond(req, res, { error: req.t("CELL_TAKEN") }, {}, {}, 400);
     board[index] = symbol;
 
     const wins = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
