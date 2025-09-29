@@ -39,7 +39,6 @@ function createMatch(req, res) {
         self: { href: `/api/v1/matches/${match.id}` },
         join: { href: `/api/v1/matches/${match.id}/join`, method: "POST" },
     };
-    // JSON => {..}; HAL => {.., _links}; CSV => one-row csv
     respond(req, res, match, links, {
         headerOrder: [
             "id", "creator_id", "opponent_id", "board", "turn", "status", "winner", "created_at"

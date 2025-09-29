@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { apiPost } from './api'
 
 const AuthCtx = createContext(null)
@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
         else localStorage.removeItem('token')
     }
 
-    const login = async (email, password) => {
+    const login = useCallback(async (email, password) => {
         setLoading(true)
         try {
             const res = await apiPost('/api/v1/auth/login', { email, password })
@@ -22,20 +22,20 @@ export function AuthProvider({ children }) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
 
-    const register = async (email, password) => {
+    const register = useCallback(async (email, password) => {
         setLoading(true)
         try {
             return await apiPost('/api/v1/auth/register', { email, password })
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
 
-    const logout = () => saveToken(null)
+    const logout = useCallback(() => saveToken(null), [])
 
-    const value = useMemo(() => ({ token, loading, login, register, logout }), [token, loading])
+    const value = useMemo(() => ({ token, loading, login, register, logout }), [token, loading, login, register, logout])
     return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }
 
