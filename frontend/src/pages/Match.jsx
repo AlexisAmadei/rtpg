@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { apiGet, apiPost } from '../lib/api'
 
@@ -9,7 +9,7 @@ export default function Match() {
     const [busy, setBusy] = useState(false)
     const timer = useRef(null)
 
-    async function load() {
+    const load = useCallback(async () => {
         setErr('')
         try {
             const data = await apiGet(`/api/v1/matches/${id}`)
@@ -17,7 +17,7 @@ export default function Match() {
         } catch (e) {
             setErr(e?.error || 'Failed to load match')
         }
-    }
+    }, [id])
 
     async function play(idx) {
         if (!m || m.status !== 'in_progress') return
@@ -36,7 +36,7 @@ export default function Match() {
         load()
         timer.current = setInterval(load, 1500)
         return () => clearInterval(timer.current)
-    }, [id])
+    }, [id, load])
 
     const board = useMemo(() => (m?.board || '_________').split(''), [m])
 
